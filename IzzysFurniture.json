@@ -1,0 +1,17 @@
+{
+  "Author": "Izzy",
+  "Name": "Izzy's Furniture",
+  "InternalName": "IzzysFurniture",
+  "AssemblyVersion": "0.1.1.0",
+  "Description": "Spawn furniture, NPCs, and map assets anywhere.",
+  "RepoUrl": "https://github.com/vmvrchelina/izzysfurniture",
+  "IconUrl": "https://raw.githubusercontent.com/vmvrchelina/izzysfurniture/main/icon.png",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "Punchline": "Do some renovations.",
+  "AcceptsFeedback": false
+}
