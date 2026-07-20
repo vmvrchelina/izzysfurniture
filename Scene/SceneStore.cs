@@ -318,7 +318,7 @@ internal sealed class SceneStore
         public FurnitureSourceKind? SourceKind { get; set; }
 
         public string SourcePath { get; set; } = string.Empty;
-        [JsonRequired]
+        // scenes saved before categories were added leave this unset
         public string Category { get; set; } = string.Empty;
         [JsonRequired]
         public IzzysFurniture.MapAssetKind MapAssetItemKind { get; set; }

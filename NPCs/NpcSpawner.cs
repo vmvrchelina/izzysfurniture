@@ -134,6 +134,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
         if (com is null)
             return false;
 
+        // client object manager
         var idCheck = com->CreateBattleCharacter();
         if (idCheck == 0xffffffff)
             return false;
@@ -220,6 +221,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
         data[25] = npc.FacePaintColor;
         character->DrawData.CustomizeData = customize;
 
+        // enpc equipment fields
         NpcEquip? equip = npc.NpcEquip.RowId == 0 ? null : npc.NpcEquip.Value;
         uint EquipModel(Func<NpcEquip, uint> get) => equip is { } value ? get(value) : 0;
         uint EquipStain(Func<NpcEquip, Lumina.Excel.RowRef<Stain>> get) => equip is { } value ? get(value).RowId : 0;
@@ -297,6 +299,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
     private static string CreateActorName(ushort objectIndex)
     {
+        // unique name
         Span<char> suffix = stackalloc char[4];
         var value = objectIndex;
         for (var index = suffix.Length - 1; index >= 0; index--)
@@ -316,7 +319,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
         // penumbra runs first
         if (!entry.PenumbraAttempted || entry.LastPenumbraCollectionId != item.NpcPenumbraCollectionId)
         {
-            ApplyPenumbraCollection(item, entry);
+            this.ApplyPenumbraCollection(item, entry);
             if (entry.AwaitingPenumbraRedraw)
                 return;
         }
@@ -336,7 +339,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
             {
                 entry.GlamourerStateAttempted = true;
                 entry.LastGlamourerStateBase64 = item.NpcGlamourerStateBase64;
-                appearanceInterop.ApplyGlamourerState(
+                this.appearanceInterop.ApplyGlamourerState(
                     entry.ObjectIndex,
                     item.NpcGlamourerStateBase64);
                 entry.GlamourerDesignAttempted = true;
@@ -353,12 +356,12 @@ internal unsafe sealed class NpcSpawner : IDisposable
             {
                 entry.GlamourerDesignAttempted = true;
                 entry.LastGlamourerDesignId = item.NpcGlamourerDesignId;
-                var applied = appearanceInterop.ApplyGlamourerDesign(
+                var applied = this.appearanceInterop.ApplyGlamourerDesign(
                     entry.ObjectIndex,
                     item.NpcGlamourerDesignId);
                 if (applied &&
                     item.NpcGlamourerDesignId != Guid.Empty &&
-                    appearanceInterop.TryGetGlamourerState(entry.ObjectIndex, out var appliedState))
+                    this.appearanceInterop.TryGetGlamourerState(entry.ObjectIndex, out var appliedState))
                 {
                     item.NpcGlamourerStateBase64 = appliedState;
                     entry.LastGlamourerStateBase64 = appliedState;
@@ -376,7 +379,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
             entry.CustomizePlusAttempted = true;
             entry.LastCustomizePlusProfileId = item.NpcCustomizePlusProfileId;
             entry.LastCustomizePlusProfileJson = item.NpcCustomizePlusProfileJson;
-            appearanceInterop.ApplyCustomizePlusProfile(
+            this.appearanceInterop.ApplyCustomizePlusProfile(
                 entry.ObjectIndex,
                 item.NpcCustomizePlusProfileJson);
         }
@@ -389,7 +392,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
         entry.PenumbraAttempted = true;
         entry.LastPenumbraCollectionId = item.NpcPenumbraCollectionId;
         var applied = !needsAssignment ||
-            appearanceInterop.SetPenumbraCollection(entry.ObjectIndex, collectionId);
+            this.appearanceInterop.SetPenumbraCollection(entry.ObjectIndex, collectionId);
         entry.GlamourerStateAttempted = false;
         entry.GlamourerDesignAttempted = false;
         entry.CustomizePlusAttempted = false;
@@ -398,7 +401,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
             return;
 
         entry.AwaitingPenumbraRedraw = true;
-        if (!appearanceInterop.RedrawPenumbraObject(entry.ObjectIndex))
+        if (!this.appearanceInterop.RedrawPenumbraObject(entry.ObjectIndex))
             entry.AwaitingPenumbraRedraw = false;
     }
 
@@ -419,11 +422,11 @@ internal unsafe sealed class NpcSpawner : IDisposable
     private NativeCharacter* GetCharacter(ushort objectIndex)
     {
         var com = ClientObjectManager.Instance();
-        if (com == null)
+        if (com is null)
             return null;
 
         var gameObject = com->GetObjectByIndex(objectIndex);
-        return gameObject == null ? null : (NativeCharacter*)gameObject;
+        return gameObject is null ? null : (NativeCharacter*)gameObject;
     }
 
     private void HideNpc(Guid id)
@@ -715,7 +718,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
         if (!this.npcs.Remove(id, out var entry))
             return;
 
-        // release temporary appearance assignments before the object table slot is freed
+        // release temporary appearance assignments
         this.appearanceInterop.ClearActor(entry.ObjectIndex);
 
         var character = this.GetCharacter(entry.ClientObjectIndex);
