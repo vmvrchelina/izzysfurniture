@@ -387,17 +387,14 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
     private void ApplyPenumbraCollection(SpawnedFurniture item, SpawnedNpc entry)
     {
-        Guid? collectionId = item.NpcPenumbraCollectionId == Guid.Empty ? null : item.NpcPenumbraCollectionId;
-        var needsAssignment = collectionId is not null || entry.LastPenumbraCollectionId != Guid.Empty;
         entry.PenumbraAttempted = true;
         entry.LastPenumbraCollectionId = item.NpcPenumbraCollectionId;
-        var applied = !needsAssignment ||
-            this.appearanceInterop.SetPenumbraCollection(entry.ObjectIndex, collectionId);
+        var applied = this.appearanceInterop.SetPenumbraCollection(entry.ObjectIndex, item.NpcPenumbraCollectionId);
         entry.GlamourerStateAttempted = false;
         entry.GlamourerDesignAttempted = false;
         entry.CustomizePlusAttempted = false;
 
-        if (!needsAssignment || !applied)
+        if (!applied)
             return;
 
         entry.AwaitingPenumbraRedraw = true;

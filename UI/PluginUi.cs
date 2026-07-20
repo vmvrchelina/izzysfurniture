@@ -1791,12 +1791,12 @@ internal sealed class PluginUi : IDisposable
             this.sceneStatus = "could not capture the appearance";
 
         var collectionPreview = selected.NpcPenumbraCollectionId == Guid.Empty
-            ? "Default"
+            ? "N/A"
             : string.IsNullOrWhiteSpace(selected.NpcPenumbraCollectionName) ? selected.NpcPenumbraCollectionId.ToString() : selected.NpcPenumbraCollectionName;
         ImGui.SetNextItemWidth(360);
         if (ImGui.BeginCombo("Penumbra collection", collectionPreview))
         {
-            if (ImGui.Selectable("Default", selected.NpcPenumbraCollectionId == Guid.Empty))
+            if (ImGui.Selectable("N/A", selected.NpcPenumbraCollectionId == Guid.Empty))
             {
                 selected.NpcPenumbraCollectionId = Guid.Empty;
                 selected.NpcPenumbraCollectionName = string.Empty;

@@ -69,8 +69,9 @@ internal sealed class NpcAppearanceInterop : IDisposable
         return true;
     }
 
-    public bool SetPenumbraCollection(ushort objectIndex, Guid? collectionId)
+    public bool SetPenumbraCollection(ushort objectIndex, Guid collectionId)
     {
+        // guid.empty is penumbra's empty collection; null is only used during cleanup
         if (!TryIpc("penumbra collection assignment failed", () => this.setCollectionForObject.Invoke(objectIndex, collectionId, true, true), out var result))
             return false;
 
