@@ -228,7 +228,8 @@ internal unsafe sealed class FurnitureSpawner
             visualState = CreateVisualState(furniture, useForcedDyes, stableEntry.MaterialSlotCount);
             var stableBgObject = (BgObject*)stableEntry.Pointer;
             if (IsModelLoaded(stableBgObject) &&
-                stableEntry.AppliedVisualState == visualState.Value)
+                stableEntry.AppliedVisualState == visualState.Value &&
+                DyeStateIsApplied(furniture, stableBgObject, useForcedDyes, stableEntry.MaterialSlotCount))
             {
                 stableBgObject->IsVisible = true;
                 return;
@@ -314,7 +315,8 @@ internal unsafe sealed class FurnitureSpawner
         }
 
         var state = furniture.PrimaryDyeStateSignature();
-        if (state == 0 || entry.PrimaryDyeState == state)
+        if (state == 0 ||
+            (entry.PrimaryDyeState == state && PrimaryDyeIsApplied(furniture, bgObject)))
             return;
 
         entry.PrimaryDyeState = state;
@@ -350,7 +352,7 @@ internal unsafe sealed class FurnitureSpawner
         }
 
         var state = furniture.ForcedDyeStateSignature(materialCount);
-        if (entry.ForcedDyeState == state)
+        if (entry.ForcedDyeState == state && ForcedDyesAreApplied(furniture, bgObject, materialCount))
             return;
 
         entry.ForcedDyeState = state;
@@ -388,6 +390,77 @@ internal unsafe sealed class FurnitureSpawner
         if (changed > 0)
             ((DrawObject*)bgObject)->UpdateMaterials();
         entry.PrimaryDyeState = 0;
+    }
+
+    private static bool DyeStateIsApplied(SpawnedFurniture furniture, BgObject* bgObject, bool useForcedDyes, int materialCount)
+        => useForcedDyes
+            ? ForcedDyesAreApplied(furniture, bgObject, materialCount)
+            : PrimaryDyeIsApplied(furniture, bgObject);
+
+    private static bool PrimaryDyeIsApplied(SpawnedFurniture furniture, BgObject* bgObject)
+    {
+        if (!furniture.SupportsFurnitureDye || furniture.PrimaryDyeStateSignature() == 0)
+            return true;
+
+        var expected = furniture.IsDyeColorEnabled(0)
+            ? ToByteColor(furniture.GetDyeColor(0))
+            : GetHousingStainColor(furniture.GetStainId(0));
+        if (expected is null || bgObject->StainBuffer is null)
+            return true;
+
+        var actual = bgObject->StainBuffer->SrgbByteColor;
+        var color = expected.Value;
+        return actual.R == color.R && actual.G == color.G && actual.B == color.B && actual.A == color.A;
+    }
+
+    private static bool ForcedDyesAreApplied(SpawnedFurniture furniture, BgObject* bgObject, int materialCount)
+    {
+        for (var slot = 0; slot < materialCount; slot++)
+        {
+            if (!furniture.IsForcedMaterialDyeColorEnabled(slot) && furniture.GetForcedMaterialStainId(slot) == 0)
+                continue;
+
+            if (!TryGetMaterialHandle(bgObject, slot, out var material))
+                return false;
+
+            var color = furniture.IsForcedMaterialDyeColorEnabled(slot)
+                ? furniture.GetForcedMaterialDyeColor(slot)
+                : ToVector4(GetHousingStainColor(furniture.GetForcedMaterialStainId(slot)));
+            if (color is null)
+                continue;
+
+            if (TryGetDiffuseColorConstant(material, out var diffuse) && !RgbMatches(diffuse, color.Value))
+                return false;
+
+            if (TryGetMaterialColorTable(material, out var table, out var width, out var height) &&
+                !ColorTableMatches(table, width, height, color.Value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool RgbMatches(Span<float> values, System.Numerics.Vector4 color)
+        => MathF.Abs(values[0] - Math.Clamp(color.X, 0.0f, 1.0f)) < 0.0001f &&
+            MathF.Abs(values[1] - Math.Clamp(color.Y, 0.0f, 1.0f)) < 0.0001f &&
+            MathF.Abs(values[2] - Math.Clamp(color.Z, 0.0f, 1.0f)) < 0.0001f;
+
+    private static bool ColorTableMatches(Span<Half> table, int width, int height, System.Numerics.Vector4 color)
+    {
+        var red = (Half)Math.Clamp(color.X, 0.0f, 1.0f);
+        var green = (Half)Math.Clamp(color.Y, 0.0f, 1.0f);
+        var blue = (Half)Math.Clamp(color.Z, 0.0f, 1.0f);
+
+        for (var row = 0; row < height; row++)
+        {
+            var offset = row * width * 4;
+            if (table[offset] != red || table[offset + 1] != green || table[offset + 2] != blue)
+                return false;
+        }
+
+        return true;
     }
 
     private void SetForcedDyeMode(SpawnedBgObject entry, bool enabled)
