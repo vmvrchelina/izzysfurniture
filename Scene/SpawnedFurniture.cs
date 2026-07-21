@@ -49,6 +49,7 @@ internal sealed class SpawnedFurniture
         this.Id = Guid.NewGuid();
         this.NpcItem = npcItem;
         this.Name = npcItem.Name;
+        this.NpcName = npcItem.Name;
         this.ModelPath = npcItem.StableKey;
         this.Position = position;
     }
@@ -116,6 +117,14 @@ internal sealed class SpawnedFurniture
     public bool IsFxEmitter => this.FxItem is not null || this.ModelPath.EndsWith(".avfx", StringComparison.OrdinalIgnoreCase);
     public bool IsNpc => this.NpcItem is not null;
 
+    public string NpcName { get; set; } = string.Empty;
+    public string NpcTitle { get; set; } = string.Empty;
+    public Vector4 NpcNameColor { get; set; } = Vector4.One;
+    public Vector4 NpcTitleColor { get; set; } = new(0.53f, 0.82f, 1.0f, 1.0f);
+    public Vector4 NpcNameplateOutlineColor { get; set; } = new(0.05f, 0.2f, 0.65f, 1.0f);
+    public float NpcNameSize { get; set; } = 20.0f;
+    public float NpcTitleSize { get; set; } = 16.0f;
+    public float NpcNameplateOutlineThickness { get; set; } = 1.5f;
     public NpcAnimationCatalogItem? NpcAnimation { get; set; }
     public bool NpcLoopAnimation { get; set; } = true;
 
@@ -235,6 +244,14 @@ internal sealed class SpawnedFurniture
 
     private void CopyNpcSettingsFrom(SpawnedFurniture source)
     {
+        this.NpcName = source.NpcName;
+        this.NpcTitle = source.NpcTitle;
+        this.NpcNameColor = source.NpcNameColor;
+        this.NpcTitleColor = source.NpcTitleColor;
+        this.NpcNameplateOutlineColor = source.NpcNameplateOutlineColor;
+        this.NpcNameSize = source.NpcNameSize;
+        this.NpcTitleSize = source.NpcTitleSize;
+        this.NpcNameplateOutlineThickness = source.NpcNameplateOutlineThickness;
         this.NpcAnimation = source.NpcAnimation;
         this.NpcLoopAnimation = source.NpcLoopAnimation;
 

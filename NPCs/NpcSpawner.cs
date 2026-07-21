@@ -48,6 +48,37 @@ internal unsafe sealed class NpcSpawner : IDisposable
         return false;
     }
 
+    public IReadOnlyList<NpcNameplate> GetNameplates()
+    {
+        var nameplates = new List<NpcNameplate>(this.npcs.Count);
+        foreach (var entry in this.npcs.Values)
+        {
+            var item = entry.SceneItem;
+            if (!entry.Visible || string.IsNullOrWhiteSpace(item.NpcName))
+                continue;
+
+            var character = this.GetCharacter(entry.ClientObjectIndex);
+            if (character is null || character->DrawObject is null)
+                continue;
+
+            var gameObject = (NativeGameObject*)character;
+            var position = new FFXIVClientStructs.FFXIV.Common.Math.Vector3();
+            gameObject->GetNamePlateWorldPosition(&position);
+            nameplates.Add(new NpcNameplate(
+                item.NpcName,
+                item.NpcTitle,
+                new Vector3(position.X, position.Y, position.Z),
+                item.NpcNameColor,
+                item.NpcTitleColor,
+                item.NpcNameplateOutlineColor,
+                item.NpcNameSize,
+                item.NpcTitleSize,
+                item.NpcNameplateOutlineThickness));
+        }
+
+        return nameplates;
+    }
+
     public bool CaptureGlamourerAppearance(Guid id, SpawnedFurniture item)
     {
         if (!this.npcs.TryGetValue(id, out var entry) ||
@@ -104,6 +135,8 @@ internal unsafe sealed class NpcSpawner : IDisposable
             this.npcs[item.Id] = entry;
         }
 
+        entry.SceneItem = item;
+
         if (entry.RecreateRequested)
         {
             this.DestroyNpc(item.Id);
@@ -116,6 +149,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
         this.ApplyAppearanceIntegrations(character, item, entry);
         this.SetNpcVisible(character, entry, true);
+        ApplyNpcName(character, item, entry);
         this.ApplyPatrol(item, entry);
         this.ApplyTransform(character, item, entry);
         this.ApplyAnimation(character, item, entry);
@@ -146,8 +180,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
         var character = (NativeCharacter*)gameObject;
         var objectIndex = gameObject->ObjectIndex;
-        var actorName = CreateActorName(objectIndex);
-        SetActorName((NativeGameObject*)gameObject, actorName);
+        SetActorName((NativeGameObject*)gameObject, item.NpcName);
         var sourceCharacter = (NativeCharacter*)localPlayer.Address;
         // this initializes native character containers before the npc data overwrites them
         character->CharacterSetup.CopyFromCharacter(sourceCharacter, CharacterSetupContainer.CopyFlags.WeaponHiding);
@@ -156,9 +189,10 @@ internal unsafe sealed class NpcSpawner : IDisposable
             com->DeleteObjectByIndex(clientObjectIndex, 0);
             return false;
         }
-        entry = new SpawnedNpc(clientObjectIndex, objectIndex);
+        entry = new SpawnedNpc(clientObjectIndex, objectIndex, item);
         this.ApplyTransform(character, item, entry, forceModified: true);
         this.SetNpcVisible(character, entry, true);
+        InitializeNpcIdentity(character, item, entry);
         return true;
     }
 
@@ -289,26 +323,33 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
     private static void SetActorName(NativeGameObject* gameObject, string name)
     {
-        var bytes = Encoding.UTF8.GetBytes(name);
-        var length = Math.Min(bytes.Length, 63);
+        Span<byte> bytes = stackalloc byte[64];
+        Encoding.UTF8.GetEncoder().Convert(name, bytes[..63], true, out _, out var length, out _);
         for (var index = 0; index < length; index++)
             gameObject->Name[index] = bytes[index];
 
         gameObject->Name[length] = 0;
     }
 
-    private static string CreateActorName(ushort objectIndex)
+    private static void InitializeNpcIdentity(NativeCharacter* character, SpawnedFurniture item, SpawnedNpc entry)
     {
-        // unique name
-        Span<char> suffix = stackalloc char[4];
-        var value = objectIndex;
-        for (var index = suffix.Length - 1; index >= 0; index--)
-        {
-            suffix[index] = (char)('a' + value % 26);
-            value /= 26;
-        }
+        var gameObject = (NativeGameObject*)character;
 
-        return $"Izzy Actor{new string(suffix)}";
+        // pc kind supplies the player's nameplate position and configured colors
+        gameObject->ObjectKind = ObjectKind.Pc;
+        gameObject->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
+        gameObject->NamePlateIconId = 0;
+        SetActorName(gameObject, item.NpcName);
+        entry.LastName = item.NpcName;
+    }
+
+    private static void ApplyNpcName(NativeCharacter* character, SpawnedFurniture item, SpawnedNpc entry)
+    {
+        if (string.Equals(entry.LastName, item.NpcName, StringComparison.Ordinal))
+            return;
+
+        SetActorName((NativeGameObject*)character, item.NpcName);
+        entry.LastName = item.NpcName;
     }
 
     private void ApplyAppearanceIntegrations(NativeCharacter* character, SpawnedFurniture item, SpawnedNpc entry)
@@ -730,10 +771,11 @@ internal unsafe sealed class NpcSpawner : IDisposable
             com->DeleteObjectByIndex(entry.ClientObjectIndex, 0);
     }
 
-    private sealed class SpawnedNpc(ushort clientObjectIndex, ushort objectIndex)
+    private sealed class SpawnedNpc(ushort clientObjectIndex, ushort objectIndex, SpawnedFurniture sceneItem)
     {
         public ushort ClientObjectIndex { get; } = clientObjectIndex;
         public ushort ObjectIndex { get; } = objectIndex;
+        public SpawnedFurniture SceneItem { get; set; } = sceneItem;
         public ushort LastTimelineId { get; set; }
         public bool LastLoopSetting { get; set; }
         public long LastSpeechMilliseconds { get; set; }
@@ -756,5 +798,17 @@ internal unsafe sealed class NpcSpawner : IDisposable
         public bool RecreateRequested { get; set; }
         public bool GlamourerStateAttempted { get; set; }
         public string LastGlamourerStateBase64 { get; set; } = string.Empty;
+        public string? LastName { get; set; }
     }
 }
+
+internal readonly record struct NpcNameplate(
+    string Name,
+    string Title,
+    Vector3 Position,
+    Vector4 NameColor,
+    Vector4 TitleColor,
+    Vector4 OutlineColor,
+    float NameSize,
+    float TitleSize,
+    float OutlineThickness);

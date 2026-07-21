@@ -291,6 +291,14 @@ internal sealed class SceneStore
 
         public NpcSourceKind NpcSourceKind { get; set; }
         public uint NpcRowId { get; set; }
+        public string NpcName { get; set; } = string.Empty;
+        public string NpcTitle { get; set; } = string.Empty;
+        public SavedColor NpcNameColor { get; set; } = SavedColor.FromVector4(Vector4.One);
+        public SavedColor NpcTitleColor { get; set; } = SavedColor.FromVector4(new Vector4(0.53f, 0.82f, 1.0f, 1.0f));
+        public SavedColor NpcNameplateOutlineColor { get; set; } = SavedColor.FromVector4(new Vector4(0.05f, 0.2f, 0.65f, 1.0f));
+        public float NpcNameSize { get; set; } = 20.0f;
+        public float NpcTitleSize { get; set; } = 16.0f;
+        public float NpcNameplateOutlineThickness { get; set; } = 1.5f;
         public ushort NpcTimelineId { get; set; }
         public bool NpcLoopAnimation { get; set; } = true;
         public bool NpcPatrolEnabled { get; set; }
@@ -325,6 +333,16 @@ internal sealed class SceneStore
 
         public bool ApplyNpcSettings(SpawnedFurniture prop, NpcAnimationCatalog animations, NpcDisplayKind displayKind)
         {
+            if (this.NpcName.Length > 0)
+                prop.NpcName = this.NpcName;
+            prop.NpcTitle = this.NpcTitle;
+            prop.NpcNameColor = ColorMath.Clamp01(this.NpcNameColor.ToVector4());
+            prop.NpcTitleColor = ColorMath.Clamp01(this.NpcTitleColor.ToVector4());
+            prop.NpcNameplateOutlineColor = ColorMath.Clamp01(this.NpcNameplateOutlineColor.ToVector4());
+            prop.NpcNameSize = Math.Clamp(this.NpcNameSize, 8.0f, 48.0f);
+            prop.NpcTitleSize = Math.Clamp(this.NpcTitleSize, 8.0f, 48.0f);
+            prop.NpcNameplateOutlineThickness = Math.Clamp(this.NpcNameplateOutlineThickness, 0.0f, 4.0f);
+
             if (this.NpcTimelineId != 0)
             {
                 prop.NpcAnimation = animations.Find(this.NpcTimelineId);
@@ -360,6 +378,14 @@ internal sealed class SceneStore
 
         private void CaptureNpcSettings(SpawnedFurniture prop)
         {
+            this.NpcName = prop.NpcName;
+            this.NpcTitle = prop.NpcTitle;
+            this.NpcNameColor = SavedColor.FromVector4(prop.NpcNameColor);
+            this.NpcTitleColor = SavedColor.FromVector4(prop.NpcTitleColor);
+            this.NpcNameplateOutlineColor = SavedColor.FromVector4(prop.NpcNameplateOutlineColor);
+            this.NpcNameSize = prop.NpcNameSize;
+            this.NpcTitleSize = prop.NpcTitleSize;
+            this.NpcNameplateOutlineThickness = prop.NpcNameplateOutlineThickness;
             if (prop.NpcAnimation is not null)
                 this.NpcTimelineId = prop.NpcAnimation.TimelineId;
             this.NpcLoopAnimation = prop.NpcLoopAnimation;

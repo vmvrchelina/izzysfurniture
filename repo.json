@@ -3,7 +3,7 @@
     "Author": "Izzy",
     "Name": "Izzy's Furniture",
     "InternalName": "IzzysFurniture",
-    "AssemblyVersion": "0.1.4.0",
+    "AssemblyVersion": "0.1.5.0",
     "Description": "Spawn furniture, NPCs, and map assets anywhere.",
     "RepoUrl": "https://github.com/vmvrchelina/izzysfurniture",
     "IconUrl": "https://raw.githubusercontent.com/vmvrchelina/izzysfurniture/main/icon.png",
@@ -13,7 +13,7 @@
     "AcceptsFeedback": false,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/vmvrchelina/izzysfurniture/releases/download/v0.1.4/izf.zip",
-    "DownloadLinkUpdate": "https://github.com/vmvrchelina/izzysfurniture/releases/download/v0.1.4/izf.zip"
+    "DownloadLinkInstall": "https://github.com/vmvrchelina/izzysfurniture/releases/download/v0.1.5/izf.zip",
+    "DownloadLinkUpdate": "https://github.com/vmvrchelina/izzysfurniture/releases/download/v0.1.5/izf.zip"
   }
 ]

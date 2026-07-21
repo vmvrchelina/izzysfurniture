@@ -9,7 +9,9 @@ using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Bindings.ImGuizmo;
 using Dalamud.Interface;
+using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.Textures;
 using SceneCameraManager = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CameraManager;
 
@@ -17,6 +19,8 @@ namespace IzzysFurniture;
 
 internal sealed class PluginUi : IDisposable
 {
+    private const float NameplateFontAtlasSize = 20.0f;
+
     private enum DuplicatePlacement
     {
         Left,
@@ -42,6 +46,7 @@ internal sealed class PluginUi : IDisposable
     private readonly HashSet<Guid> draggedFurnitureIds = [];
     private readonly InteriorFixtureState interiorFixtures = new();
     private readonly FileDialogManager fileDialogManager = new();
+    private readonly IFontHandle nameplateFont;
 
     private bool isOpen;
     private bool openAddPicker;
@@ -90,6 +95,8 @@ internal sealed class PluginUi : IDisposable
         this.spawner = spawner;
         this.npcAppearanceInterop = npcAppearanceInterop;
         this.npcSpawner = npcSpawner;
+        this.nameplateFont = Service.PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(
+            new GameFontStyle(GameFontFamily.Axis, NameplateFontAtlasSize));
     }
 
     public SpawnedFurniture? SelectedFurniture
@@ -107,11 +114,14 @@ internal sealed class PluginUi : IDisposable
 
     public void Dispose()
     {
+        nameplateFont.Dispose();
         syncClient.Dispose();
     }
 
     public void Draw()
     {
+        this.DrawNpcNameplates();
+
         if (!this.isOpen)
             return;
 
@@ -1374,16 +1384,19 @@ internal sealed class PluginUi : IDisposable
 
     private string DisplayNameWithDuplicateIndex(SpawnedFurniture furniture)
     {
+        var displayName = furniture.IsNpc && !string.IsNullOrWhiteSpace(furniture.NpcName)
+            ? furniture.NpcName
+            : furniture.Name;
         var path = furniture.ModelPath.Trim();
         var matching = this.spawned
             .Where(item => item.ModelPath.Trim().Equals(path, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         if (matching.Length <= 1)
-            return furniture.Name;
+            return displayName;
 
         var index = Array.FindIndex(matching, item => item.Id == furniture.Id);
-        return $"{furniture.Name} #{index + 1}";
+        return $"{displayName} #{index + 1}";
     }
 
     private IEnumerable<MapAssetCatalogItem> FilteredMapAssets(IReadOnlyList<MapAssetCatalogItem> items)
@@ -1632,9 +1645,115 @@ internal sealed class PluginUi : IDisposable
             selected.FxColor = ColorMath.Clamp01(color);
     }
 
+    private void DrawNpcNameplates()
+    {
+        if (Service.GameGui.GameUiHidden || !this.nameplateFont.Available)
+            return;
+
+        using var pushedFont = this.nameplateFont.Push();
+        var drawList = ImGui.GetBackgroundDrawList();
+        foreach (var nameplate in this.npcSpawner.GetNameplates())
+        {
+            if (!Service.GameGui.WorldToScreen(nameplate.Position, out var screen))
+                continue;
+
+            var nameTop = DrawNameplateLine(
+                drawList,
+                nameplate.Name,
+                screen.X,
+                screen.Y,
+                nameplate.NameSize,
+                nameplate.NameColor,
+                nameplate.OutlineColor,
+                nameplate.OutlineThickness);
+
+            if (!string.IsNullOrWhiteSpace(nameplate.Title))
+            {
+                DrawNameplateLine(
+                    drawList,
+                    nameplate.Title,
+                    screen.X,
+                    nameTop - 1.0f,
+                    nameplate.TitleSize,
+                    nameplate.TitleColor,
+                    nameplate.OutlineColor,
+                    nameplate.OutlineThickness);
+            }
+        }
+    }
+
+    private static float DrawNameplateLine(
+        ImDrawListPtr drawList,
+        string text,
+        float centerX,
+        float bottom,
+        float fontSize,
+        Vector4 color,
+        Vector4 outlineColor,
+        float outlineThickness)
+    {
+        var scale = fontSize / NameplateFontAtlasSize;
+        var textSize = ImGui.CalcTextSize(text) * scale;
+        var position = new Vector2(centerX - textSize.X * 0.5f, bottom - textSize.Y);
+        var font = ImGui.GetFont();
+        var edge = ImGui.GetColorU32(outlineColor);
+
+        if (outlineThickness > 0.0f)
+        {
+            drawList.AddText(font, fontSize, position + new Vector2(-outlineThickness, -outlineThickness), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(0, -outlineThickness), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(outlineThickness, -outlineThickness), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(-outlineThickness, 0), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(outlineThickness, 0), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(-outlineThickness, outlineThickness), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(0, outlineThickness), edge, text);
+            drawList.AddText(font, fontSize, position + new Vector2(outlineThickness, outlineThickness), edge, text);
+        }
+
+        drawList.AddText(font, fontSize, position, ImGui.GetColorU32(color), text);
+        return position.Y;
+    }
+
     private void DrawNpcControls(SpawnedFurniture selected)
     {
         ImGui.Spacing();
+        var npcName = selected.NpcName;
+        ImGui.SetNextItemWidth(360);
+        if (ImGui.InputText("Name", ref npcName, 64))
+            selected.NpcName = npcName;
+
+        var npcTitle = selected.NpcTitle;
+        ImGui.SetNextItemWidth(360);
+        if (ImGui.InputText("Title", ref npcTitle, 64))
+            selected.NpcTitle = npcTitle;
+
+        var nameSize = selected.NpcNameSize;
+        ImGui.SetNextItemWidth(260);
+        if (ImGui.SliderFloat("Name size", ref nameSize, 8.0f, 48.0f, "%.1f"))
+            selected.NpcNameSize = nameSize;
+
+        var titleSize = selected.NpcTitleSize;
+        ImGui.SetNextItemWidth(260);
+        if (ImGui.SliderFloat("Title size", ref titleSize, 8.0f, 48.0f, "%.1f"))
+            selected.NpcTitleSize = titleSize;
+
+        var outlineThickness = selected.NpcNameplateOutlineThickness;
+        ImGui.SetNextItemWidth(260);
+        if (ImGui.SliderFloat("Outline", ref outlineThickness, 0.0f, 4.0f, "%.1f"))
+            selected.NpcNameplateOutlineThickness = outlineThickness;
+
+        var nameColor = selected.NpcNameColor;
+        if (ImGui.ColorEdit4("Name color", ref nameColor, ImGuiColorEditFlags.PickerHueWheel))
+            selected.NpcNameColor = ColorMath.Clamp01(nameColor);
+
+        var titleColor = selected.NpcTitleColor;
+        if (ImGui.ColorEdit4("Title color", ref titleColor, ImGuiColorEditFlags.PickerHueWheel))
+            selected.NpcTitleColor = ColorMath.Clamp01(titleColor);
+
+        var outlineColor = selected.NpcNameplateOutlineColor;
+        if (ImGui.ColorEdit4("Outline color", ref outlineColor, ImGuiColorEditFlags.PickerHueWheel))
+            selected.NpcNameplateOutlineColor = ColorMath.Clamp01(outlineColor);
+
         this.DrawNpcAppearanceControls(selected);
         ImGui.Separator();
         ImGui.TextUnformatted("Animation");
