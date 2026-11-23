@@ -127,7 +127,8 @@ internal sealed class NpcAnimationCatalog
             key.Contains("walk", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("run", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("move", StringComparison.OrdinalIgnoreCase) ||
-            key.Contains("loop", StringComparison.OrdinalIgnoreCase);
+            key.Contains("loop", StringComparison.OrdinalIgnoreCase) ||
+            key.Contains("seiza", StringComparison.OrdinalIgnoreCase);
 
     private static string CategorizeTimeline(string key, bool isLoop)
     {

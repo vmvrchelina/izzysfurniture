@@ -86,7 +86,7 @@ internal sealed class NpcCatalog
 
         foreach (var npc in Service.DataManager.GetExcelSheet<ENpcBase>())
         {
-            if (npc.RowId == 0 || npc.ModelChara.RowId == 0)
+            if (npc.RowId == 0 || (npc.ModelChara.RowId == 0 && (npc.Race.RowId == 0 || npc.Tribe.RowId == 0)))
                 continue;
 
             var name = ResolveName(eventNpcNames, npc.RowId, "ENpc");
@@ -99,7 +99,7 @@ internal sealed class NpcCatalog
 
         foreach (var npc in Service.DataManager.GetExcelSheet<BNpcBase>())
         {
-            if (npc.RowId == 0 || npc.ModelChara.RowId == 0)
+            if (npc.RowId == 0 || (npc.ModelChara.RowId == 0 && npc.BNpcCustomize.RowId == 0 && npc.NpcEquip.RowId == 0))
                 continue;
 
             AddUsage(usages, npc.ModelChara.RowId, new ModelCharaUsage(
@@ -126,7 +126,7 @@ internal sealed class NpcCatalog
 
         foreach (var npc in Service.DataManager.GetExcelSheet<ENpcBase>())
         {
-            if (npc.RowId == 0 || npc.ModelChara.RowId == 0)
+            if (npc.RowId == 0 || (npc.ModelChara.RowId == 0 && (npc.Race.RowId == 0 || npc.Tribe.RowId == 0)))
                 continue;
 
             var name = ResolveName(eventNpcNames, npc.RowId, "ENpc");
@@ -141,7 +141,7 @@ internal sealed class NpcCatalog
 
         foreach (var npc in Service.DataManager.GetExcelSheet<BNpcBase>())
         {
-            if (npc.RowId == 0 || npc.ModelChara.RowId == 0)
+            if (npc.RowId == 0 || (npc.ModelChara.RowId == 0 && npc.BNpcCustomize.RowId == 0 && npc.NpcEquip.RowId == 0))
                 continue;
 
             rows.Add(new NpcCatalogItem(
@@ -178,7 +178,7 @@ internal sealed class NpcCatalog
     }
 
     private static NpcDisplayKind ModelDisplayKind(ModelChara model)
-        => model.Type == (byte)CharacterBase.ModelType.Human
+        => model.RowId == 0 || model.Type == (byte)CharacterBase.ModelType.Human
             ? NpcDisplayKind.Human
             : NpcDisplayKind.NonHuman;
 

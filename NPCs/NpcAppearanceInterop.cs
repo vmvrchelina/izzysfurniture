@@ -108,7 +108,7 @@ internal sealed class NpcAppearanceInterop : IDisposable
             return result is GlamourerApiEc.Success or GlamourerApiEc.NothingDone;
         }
 
-        if (!TryIpc("605", () => this.applyDesign.Invoke(designId, objectIndex, 0, ApplyFlagEx.DesignDefault), out result))
+        if (!TryIpc("605", () => this.applyDesign.Invoke(designId, objectIndex, 0, ApplyFlag.Equipment | ApplyFlag.Customization), out result))
             return false;
 
         if (result == GlamourerApiEc.Success)

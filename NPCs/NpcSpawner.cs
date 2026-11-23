@@ -22,7 +22,6 @@ internal unsafe sealed class NpcSpawner : IDisposable
     private enum NpcDrawState
     {
         WaitingToEnable,
-        RedrawRequested,
         WaitingForModel,
         Ready,
     }
@@ -202,16 +201,12 @@ internal unsafe sealed class NpcSpawner : IDisposable
         var character = (NativeCharacter*)gameObject;
         var objectIndex = gameObject->ObjectIndex;
         var sourceCharacter = (NativeCharacter*)localPlayer.Address;
-        NpcActorIdentity.Initialize(character, sourceCharacter->HomeWorld);
-        // this initializes native character containers before the npc data overwrites them
-        character->CharacterSetup.CopyFromCharacter(sourceCharacter, CharacterSetupContainer.CopyFlags.WeaponHiding);
         if (!this.ApplyAppearance(character, item.NpcItem!))
         {
             com->DeleteObjectByIndex(clientObjectIndex, 0);
             return false;
         }
         NpcActorIdentity.Initialize(character, sourceCharacter->HomeWorld);
-        character->CharacterSetup.CopyFromCharacter(character, CharacterSetupContainer.CopyFlags.None);
         entry = new SpawnedNpc(clientObjectIndex, objectIndex, (nint)character, item);
         this.ApplyTransform(character, item, entry, forceModified: true);
         this.SetNpcVisible(character, entry, true);
@@ -244,6 +239,13 @@ internal unsafe sealed class NpcSpawner : IDisposable
         var npc = Service.DataManager.GetExcelSheet<ENpcBase>().GetRow(rowId);
         character->BaseId = rowId;
         character->ModelContainer.ModelCharaId = (int)npc.ModelChara.RowId;
+        var model = npc.ModelChara.Value;
+        character->ModelContainer.ModelSkeletonId = model.Type switch
+        {
+            2 => model.Model + 10000,
+            3 => model.Model,
+            _ => 0,
+        };
 
         var customize = character->DrawData.CustomizeData;
         var data = customize.Data;
@@ -392,7 +394,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
                 entry.GlamourerDesignAttempted = true;
                 entry.LastGlamourerDesignId = item.NpcGlamourerDesignId;
                 entry.CustomizePlusAttempted = false;
-                entry.DrawState = NpcDrawState.RedrawRequested;
+                entry.DrawState = NpcDrawState.WaitingForModel;
                 entry.NextAppearanceAttemptMilliseconds = 0;
                 entry.AppearanceError = 0;
                 return;
@@ -427,7 +429,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
                 entry.CustomizePlusAttempted = false;
                 if (item.NpcGlamourerDesignId != Guid.Empty)
                 {
-                    entry.DrawState = NpcDrawState.RedrawRequested;
+                    entry.DrawState = NpcDrawState.WaitingForModel;
                     entry.NextAppearanceAttemptMilliseconds = 0;
                     entry.AppearanceError = 0;
                     return;
@@ -487,7 +489,7 @@ internal unsafe sealed class NpcSpawner : IDisposable
             if (entry.ObjectIndex != objectIndex || entry.Pointer != address || this.GetCharacter(entry) is null)
                 continue;
 
-            entry.DrawState = NpcDrawState.RedrawRequested;
+            entry.DrawState = NpcDrawState.WaitingForModel;
             entry.NextAppearanceAttemptMilliseconds = 0;
             entry.CustomizePlusAttempted = false;
             // force one transform write
@@ -545,18 +547,6 @@ internal unsafe sealed class NpcSpawner : IDisposable
 
     private bool UpdateDraw(NativeCharacter* character, SpawnedNpc entry)
     {
-        if (entry.DrawState == NpcDrawState.RedrawRequested)
-        {
-            character->DisableDraw();
-            entry.DrawState = NpcDrawState.WaitingToEnable;
-            entry.LastDrawObject = 0;
-            entry.CustomizePlusAttempted = false;
-            entry.LastAppliedPosition = new Vector3(float.NaN, float.NaN, float.NaN);
-            entry.LastAppliedYawRadians = float.NaN;
-            entry.LastAppliedScale = float.NaN;
-            return false;
-        }
-
         if (entry.DrawState == NpcDrawState.WaitingToEnable)
         {
             if (character->IsReadyToDraw())
